@@ -46,11 +46,16 @@
   }
 
   function renderBottomNav(navEl) {
-    const activeTab = mainContent && mainContent.type === 'settings' ? 'settings' : 'notes'
+    const activeTab = mainContent && (mainContent.type === 'settings' || mainContent.type === 'trash')
+      ? mainContent.type
+      : 'notes'
     navEl.innerHTML = `
       <nav class="bottom-nav">
         <button class="nav-btn ${activeTab === 'notes' ? 'active' : ''}" id="nav-notes">
           ${Icon.file}<span>Notes</span>
+        </button>
+        <button class="nav-btn ${activeTab === 'trash' ? 'active' : ''}" id="nav-trash">
+          ${Icon.trash}<span>Trash</span>
         </button>
         <button class="nav-btn ${activeTab === 'settings' ? 'active' : ''}" id="nav-settings">
           ${Icon.settings}<span>Settings</span>
@@ -59,6 +64,12 @@
     `
     navEl.querySelector('#nav-notes').onclick = () => {
       mainContent = null
+      updateShellState()
+      renderMain()
+      renderSidebar()
+    }
+    navEl.querySelector('#nav-trash').onclick = () => {
+      mainContent = { type: 'trash' }
       updateShellState()
       renderMain()
       renderSidebar()
@@ -125,6 +136,21 @@
         },
       })
       currentDestroy = result.destroy
+      return
+    }
+
+    if (mainContent.type === 'trash') {
+      const result = renderTrashView(mainEl, {
+        userId: Auth.user.id,
+        onBack: () => {
+          mainContent = null
+          updateShellState()
+          renderMain()
+          renderSidebar()
+        },
+        renderNav: renderBottomNav,
+      })
+      currentDestroy = result.destroy
     }
   }
 
@@ -134,6 +160,7 @@
     renderSidebar()
     renderMain()
     updateShellState()
+    Notes.purgeExpired(Auth.user.id)
 
     Notes.onChange(() => {
       // keep the list section fresh (titles/snippets/order can change while

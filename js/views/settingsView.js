@@ -24,6 +24,17 @@ function renderSettingsView(root, { user, onBack, onSignOut }) {
           </div>
         </div>
 
+        <div class="section-label">Import Notes</div>
+        <div class="card">
+          <div class="pad">
+            <div class="hint">Bring notes in from a JSON file — each item should look like <code>{"title": "...", "body": "..."}</code>. Existing notes are left untouched; imported notes are added alongside them.</div>
+            <input type="file" accept="application/json,.json" id="import-file" style="display:block;font-size:13px;margin-bottom:10px" />
+            <button class="btn btn-dark btn-icon" id="import-btn" disabled>${Icon.file} <span id="import-label">Choose a file first</span></button>
+            <div class="form-msg" id="import-error" style="color:var(--danger)"></div>
+            <div class="form-msg" id="import-info" style="color:var(--success)"></div>
+          </div>
+        </div>
+
         <div class="section-label">Sign in on another device</div>
         <div class="card">
           <div class="pad">
@@ -115,6 +126,49 @@ function renderSettingsView(root, { user, onBack, onSignOut }) {
 
   root.querySelector('#signout-btn').onclick = onSignOut
   root.querySelector('#settings-back-btn').onclick = onBack
+
+  const importFile = root.querySelector('#import-file')
+  const importBtn = root.querySelector('#import-btn')
+  const importLabel = root.querySelector('#import-label')
+  const importError = root.querySelector('#import-error')
+  const importInfo = root.querySelector('#import-info')
+  let selectedFile = null
+
+  importFile.onchange = () => {
+    selectedFile = importFile.files[0] || null
+    importError.textContent = ''
+    importInfo.textContent = ''
+    importBtn.disabled = !selectedFile
+    importLabel.textContent = selectedFile ? `Import "${selectedFile.name}"` : 'Choose a file first'
+  }
+
+  importBtn.onclick = async () => {
+    if (!selectedFile) return
+    importError.textContent = ''
+    importInfo.textContent = ''
+    importBtn.disabled = true
+
+    try {
+      const text = await selectedFile.text()
+      const parsed = JSON.parse(text)
+      if (!Array.isArray(parsed)) throw new Error('That file should contain a JSON array of notes.')
+      if (parsed.length === 0) throw new Error('That file has no notes in it.')
+
+      importLabel.textContent = `Importing 0 / ${parsed.length}…`
+      await Notes.importNotes(user.id, parsed, (done, total) => {
+        importLabel.textContent = `Importing ${done} / ${total}…`
+      })
+      importInfo.textContent = `Imported ${parsed.length} note${parsed.length === 1 ? '' : 's'}.`
+      importLabel.textContent = 'Choose a file first'
+      importFile.value = ''
+      selectedFile = null
+    } catch (err) {
+      importError.textContent = err.message || 'Could not import that file.'
+      importLabel.textContent = selectedFile ? `Import "${selectedFile.name}"` : 'Choose a file first'
+    } finally {
+      importBtn.disabled = !selectedFile
+    }
+  }
 
   return {
     destroy() {

@@ -7,12 +7,21 @@ create table if not exists public.notes (
   body text not null default '',
   pinned boolean not null default false,
   is_deleted boolean not null default false,
+  deleted_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
+-- Safe to re-run: adds the column if you already created the table before
+-- trash support existed.
+alter table public.notes add column if not exists deleted_at timestamptz;
+
 create index if not exists notes_user_id_updated_at_idx
   on public.notes (user_id, updated_at desc);
+
+create index if not exists notes_user_id_deleted_at_idx
+  on public.notes (user_id, deleted_at)
+  where is_deleted = true;
 
 -- Keep updated_at current on every change (belt-and-braces backup timestamp,
 -- in addition to the client sending it on every autosave).
